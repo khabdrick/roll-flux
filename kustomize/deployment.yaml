@@ -1,48 +1,58 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp
+  name: nginx
 spec:
-  ports:
-  - port: 8000
-    name: http
+  type: LoadBalancer
   selector:
-    app: myapp
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: myapp-account
-  labels:
-    account: myapp
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: myapp-v1
+ name: nginx
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: myapp
-      version: v1
-  template:
-    metadata:
-      labels:
-        app: myapp
-        version: v1
-    spec:
-      serviceAccountName: myapp-account
-      containers:
-      - name: myapp
-        image: docker.io/khabdrick/quotes:v1
-        resources:
-          requests:
-            cpu: "100m"  # Requests 100 milliCPUs
-            memory: "256Mi" 
-          limits:
-            cpu: "200m"  # Limits the CPU usage to 200 milliCPUs
-            memory: "512Mi"  
-        ports:
-        - containerPort: 8000
+ replicas: 3
+ selector:
+   matchLabels:
+     app: nginx
+ template:
+   metadata:
+     labels:
+       app: nginx
+   spec:
+     containers:
+     - name: nginx
+       image: nginx:1.19.2
+       ports:
+       - containerPort: 80
+---
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: nginx
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx
+  service:
+    port: 80
+  analysis:
+    interval: 1m
+    threshold: 10
+    metrics:
+      - name: request-success-rate
+        threshold: 99
+        interval: 1m
+    webhooks:
+      - name: load-test
+        type: pre-rollout
+        url: http://flagger-loadtester.test/
+        timeout: 30s
 ---
