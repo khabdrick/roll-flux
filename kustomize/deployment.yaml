@@ -10,14 +10,13 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
-
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
  name: nginx
 spec:
- replicas: 3
+ replicas: 1
  selector:
    matchLabels:
      app: nginx
@@ -32,10 +31,12 @@ spec:
        ports:
        - containerPort: 80
 ---
+# canaries/nginx-canary.yaml
 apiVersion: flagger.app/v1beta1
 kind: Canary
 metadata:
   name: nginx
+  namespace: default
 spec:
   targetRef:
     apiVersion: apps/v1
@@ -45,6 +46,7 @@ spec:
     port: 80
   analysis:
     interval: 1m
+    iterations: 10
     threshold: 10
     metrics:
       - name: request-success-rate
